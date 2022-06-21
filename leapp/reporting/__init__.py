@@ -9,6 +9,7 @@ from leapp.compat import string_types
 from leapp.models import fields, Model, ErrorModel
 from leapp.topics import ReportTopic
 from leapp.libraries.stdlib.api import produce
+from leapp.utils.deprecation import deprecated
 
 
 class Report(Model):
@@ -159,9 +160,17 @@ class Groups(BaseListPrimitive):
         self._value = value
 
 
-# To gradually switch from using Tags and Flags to using Groups make Tags and Flags aliases of Groups
-Tags = Groups
-Flags = Groups
+@deprecated(since='2022-06-21', message='Flags have been deprecated in favor of Groups.')
+class Flags(Groups):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+
+@deprecated(since='2022-06-21', message='Tags have been deprecated in favor of Groups.')
+class Tags(Groups):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
 
 # To allow backwards-compatibility with previous report-schema
 # Groups that match _DEPRECATION_FLAGS will be shown as flags, the rest as tags
@@ -326,6 +335,13 @@ def _create_report_object(entries):
     _sanitize_entries(entries)
     for entry in entries:
         entry.apply(report)
+
+    # Flags have been deprecated in favaour of Groups, this workaround is for when
+    # leapp got upgraded to a version that has Flags deprecated, but leapp-repository
+    # was not upgraded to reflect this change wrt. how it detects inhibitors - still
+    # checks for flags field in report in order to stop the upgrade
+    if Groups.INHIBITOR in report.get('groups', []):
+        report['flags'] = [Groups.INHIBITOR]
 
     return Report(report=report)
 
